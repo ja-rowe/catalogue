@@ -1,0 +1,54 @@
+trigger:
+- master
+
+resources:
+- repo: self
+
+variables:
+- group: aks-terraform
+- name: imageRepository
+  value: 'catalogue'
+- name: dockerfilePath
+  value: '$(Build.SourcesDirectory)/docker'
+- name: tag
+  value: '$(Build.BuildId)'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      name: default
+    steps:
+      - script: 'sudo apt install build-essential -y'
+      - task: Bash@3
+        displayName: Build jar file
+        inputs:
+          targetType: 'inline'
+          script: |
+            export GROUP=sockshop1 
+            export COMMIT=test
+            
+            ./build.sh
+          workingDirectory: '$(Build.SourcesDirectory)/scripts'
+      - task: Docker@2
+        displayName: Build and push catalogue image to container registry
+        inputs:
+          command: buildAndPush
+          repository: $(imageRepository)
+          dockerfile: '$(dockerfilePath)/catalogue/Dockerfile'
+          containerRegistry: $(dockerRegistryServiceConnection)
+          buildContext: '$(Build.SourcesDirectory)'
+          tags: |
+            $(tag)
+      - task: Docker@2
+        displayName: Build and push catalogue-db image to container registry
+        inputs:
+          command: buildAndPush
+          repository: 'catalogue-db'
+          dockerfile: '$(dockerfilePath)/catalogue-db/Dockerfile'
+          containerRegistry: $(dockerRegistryServiceConnection)
+          tags: |
+            $(tag)
